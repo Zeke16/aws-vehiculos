@@ -1,0 +1,149 @@
+service: aws-vehiculos
+frameworkVersion: "3"
+
+plugins:
+  - serverless-bundle
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  memorySize: 256
+  region: us-west-2
+  stage: ${opt:stage, 'dev'}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:Query
+        # - s3:PutObject
+      Resource:
+        - "arn:aws:dynamodb:us-west-2:580085829035:table/CarsTable"
+        # - "arn:aws:s3:::images-cars-bucket/*"
+        - !Join [
+            "/",
+            [
+              arn:aws:dynamodb:us-west-2:580085829035:table/CarsTable,
+              "index",
+              "estadoCreatedAtIndex",
+            ],
+          ]
+        - !Join [
+            "/",
+            [
+              arn:aws:dynamodb:us-west-2:580085829035:table/CarsTable,
+              "index",
+              "estadoYearIndex",
+            ],
+          ]
+resources:
+  Resources:
+    GatewayResponseDefault4XX:
+      Type: "AWS::ApiGateway::GatewayResponse"
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: "ApiGatewayRestApi"
+    # ImageUploadBucket:
+    #  Type: AWS::S3::Bucket
+    #  Properties:
+    #    BucketName: images-cars-bucket
+    #    PublicAccessBlockConfiguration:
+    #      BlockPublicAcls: false
+    #    OwnershipControls:
+    #      Rules:
+    #        - ObjectOwnership: ObjectWriter
+    CarsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: CarsTable
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: estado
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+          - AttributeName: year
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: estadoCreatedAtIndex
+            KeySchema:
+              - AttributeName: estado
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: estadoYearIndex
+            KeySchema:
+              - AttributeName: estado
+                KeyType: HASH
+              - AttributeName: year
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+functions:
+  GetCarsByEstado:
+    handler: src/handlers/GetCarsByEstado.handler
+    events:
+      - http:
+          path: /cars
+          method: GET
+          #authorizer: ${self:custom.authorizer}
+          cors: true
+  GetCarsByYear:
+    handler: src/handlers/GetCarsByYear.handler
+    events:
+      - http:
+          path: /cars/{year}/{estado}
+          method: GET
+          #authorizer: ${self:custom.authorizer}
+          cors: true
+  GetCarById:
+    handler: src/handlers/GetCarById.handler
+    events:
+      - http:
+          path: /car/{id}
+          method: GET
+          #authorizer: ${self:custom.authorizer}
+          cors: true
+  CreateCar:
+    handler: src/handlers/CreateCar.handler
+    events:
+      - http:
+          path: /car
+          method: POST
+          authorizer: ${self:custom.authorizer}
+          cors: true
+  UpdateCar:
+    handler: src/handlers/UpdateCar.handler
+    events:
+      - http:
+          path: /car/{id}
+          method: PATCH
+          #authorizer: ${self:custom.authorizer}
+          cors: true
+  DeleteCar:
+    handler: src/handlers/DeleteCar.handler
+    events:
+      - http:
+          path: /car/{id}
+          method: DELETE
+          #authorizer: ${self:custom.authorizer}
+          cors: true
+
+custom:
+  authorizer: arn:aws:lambda:us-west-2:580085829035:function:aws-auth-dev-auth
+  bundle:
+    linting: false

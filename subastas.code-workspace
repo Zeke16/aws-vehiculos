@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../subastas"
+		},
+		{
+			"path": "../aws-auth"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
